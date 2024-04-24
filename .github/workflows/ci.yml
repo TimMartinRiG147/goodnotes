@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KIND_VERSION: v0.14.0
-      KUBECTL_VERSION: stable
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
