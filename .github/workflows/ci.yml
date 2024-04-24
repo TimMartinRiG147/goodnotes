@@ -56,11 +56,9 @@ jobs:
     - name: Load Testing
       run: |
         bash ./scripts/load-test.sh
-        # cat load-test-results.txt
-        # cat foo-load-test-results.txt
-        # cat bar-load-test-results.txt
 
     - name: Post results to PR
+      if: github.event_name == 'pull_request'
       uses: actions/github-script@v6
       with:
         github-token: ${{ secrets.GH_TOKEN }}
@@ -70,6 +68,6 @@ jobs:
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
-            repo: context.repo.name,
+            repo: context.repo.repo,
             body: siegeResults
           });
