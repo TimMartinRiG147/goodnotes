@@ -12,21 +12,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # Download and install KinD (Kubernetes in Docker).
     - name: Setup KinD Cluster
       run: |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.14.0/kind-$(uname)-amd64
         chmod +x ./kind
-        ./kind create cluster --config ./config/cluster.yaml
+        if ! ./kind create cluster --config ./config/cluster.yaml; then
+          echo "Failed to create KinD cluster"
+          exit 1
+        fi
 
-    # Disables IPv6 on the system to avoid conflicts, necessary for some network setups.
     - name: Disable IPv6
       run: |
-        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-        sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+        if ! sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 || ! sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 || ! sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1; then
+          echo "Failed to disable IPv6"
+          exit 1
+        fi
 
-    # Install necessary tools and updates.
     - name: Configuration, tools and dependencies
       run: |
         sudo apt update && sudo apt install siege -y
@@ -35,30 +36,35 @@ jobs:
         sudo mv ./kubectl /usr/local/bin/kubectl
         chmod +x ./scripts/*.sh
 
-    # Deploy Kubernetes applications and ingress.
     - name: Deploy Applications and Ingress
       run: |
-        kubectl apply -f ./config/deployment-bar.yaml
-        kubectl apply -f ./config/deployment-foo.yaml
-        kubectl apply -f ./config/ingress.yaml
-        sleep 15 # Waits briefly to ensure resources are up before proceeding.
+        if ! kubectl apply -f ./config/deployment-bar.yaml || ! kubectl apply -f ./config/deployment-foo.yaml || ! kubectl apply -f ./config/ingress.yaml; then
+          echo "Failed to apply Kubernetes configurations"
+          exit 1
+        fi
+        sleep 15
 
     - name: Deploy Ingress Controller
-      run: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+      run: |
+        if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml; then
+          echo "Failed to deploy Ingress Controller"
+          exit 1
+        fi
 
-    # Ensures that all deployments are fully available before proceeding.
     - name: Wait for Deployments
       run: |
         sleep 15
-        kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx
-        kubectl wait --for=condition=available --timeout=300s deployment/bar
-        kubectl wait --for=condition=available --timeout=300s deployment/foo
-      # Add error handling in case deployments fail.
+        if ! kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx || ! kubectl wait --for=condition=available --timeout=300s deployment/bar || ! kubectl wait --for=condition=available --timeout=300s deployment/foo; then
+          echo "Deployment did not become available"
+          exit 1
+        fi
 
-    # Executes a load test script and captures the output for reporting.
     - name: Load Testing
       run: |
-        bash ./scripts/load-test.sh
+        if ! bash ./scripts/load-test.sh; then
+          echo "Load testing failed"
+          exit 1
+        fi
 
     - name: Post results to PR
       uses: actions/github-script@v6
