@@ -67,7 +67,7 @@ jobs:
     #       exit 1
     #     fi
 
-    - name: Verify Health of Deployments and Ingress
+    - name: Verify Health of Specific Deployments
       run: |
         # Verifies that specific deployments are healthy before proceeding.
         echo "Checking health of Kubernetes deployments..."
@@ -75,18 +75,25 @@ jobs:
         max_retries=12
         sleep_interval=10
         
-        # Function to check if deployment pods are running
+        # Function to check if deployment pods are running based on labels
         check_deployment_running() {
-          local deployment_name=$1
-          kubectl get pods --selector=app=${deployment_name} -A --field-selector=status.phase=Running | grep -q 'Running'
+          local label_selector=$1
+          kubectl get pods --selector="$label_selector" -A --field-selector=status.phase=Running | grep -q 'Running'
         }
 
-        # Verify each deployment individually
-        for deployment in ingress-nginx-controller bar foo; do
-          echo "Checking deployment: $deployment"
+        # Define deployments and their respective label selectors and namespaces
+        declare -A deployments=(
+          ["ingress-nginx-controller"]="app.kubernetes.io/component=controller"
+          ["foo"]="app=foo"
+          ["bar"]="app=bar"
+        )
+
+        # Check each deployment for health
+        for deployment in "${!deployments[@]}"; do
+          echo "Checking $deployment deployment"
           success=false
           for ((i=0; i<$max_retries; i++)); do
-            if check_deployment_running $deployment; then
+            if check_deployment_running "${deployments[$deployment]}" "$namespace"; then
               echo "$deployment deployment is healthy."
               success=true
               break
@@ -100,6 +107,7 @@ jobs:
             exit 1
           fi
         done
+
 
     - name: Load Testing
       run: |
