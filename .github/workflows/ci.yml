@@ -78,7 +78,7 @@ jobs:
         # Function to check if deployment pods are running
         check_deployment_running() {
           local deployment_name=$1
-          kubectl get pods --selector=app=${deployment_name} -n ingress-nginx --field-selector=status.phase=Running | grep -q 'Running'
+          kubectl get pods --selector=app=${deployment_name} -A --field-selector=status.phase=Running | grep -q 'Running'
         }
 
         # Verify each deployment individually
