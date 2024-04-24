@@ -81,7 +81,6 @@ jobs:
       with:
         github-token: ${{ secrets.GH_TOKEN }}
         script: |
-          # Create a PR comment with the results of the load test
           const fs = require('fs');
           const siegeResults = fs.readFileSync('siege_results.txt', 'utf8');
           github.rest.issues.createComment({
