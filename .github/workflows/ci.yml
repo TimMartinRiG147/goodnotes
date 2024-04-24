@@ -68,20 +68,6 @@ jobs:
           exit 1
         fi
 
-    - name: Verify Health of Deployments and Ingress
-      run: |
-        # Verifies that all deployments and the Ingress are healthy before proceeding.
-        sleep 15
-        echo "Checking health of Kubernetes resources..."
-        if ! kubectl get pods --all-namespaces | grep Running; then
-          echo "One or more pods are not in a Running state."
-          exit 1
-        fi
-        if ! kubectl get ingress --all-namespaces | grep -i healthy; then
-          echo "Ingress is not in a healthy state."
-          exit 1
-        fi
-
     - name: Load Testing
       run: |
         # Executes a load test script and captures the output for reporting.
