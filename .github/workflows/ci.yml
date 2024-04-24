@@ -59,14 +59,46 @@ jobs:
           exit 1
         fi
 
-    - name: Wait for Deployments
+    - name: Verify Health of Deployments
       run: |
-        # Ensures that all deployments are fully available before proceeding.
-        sleep 15
-        if ! kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx || ! kubectl wait --for=condition=available --timeout=300s deployment/bar || ! kubectl wait --for=condition=available --timeout=300s deployment/foo; then
-          echo "Deployment did not become available"
-          exit 1
-        fi
+        # Verifies that specific deployments are healthy before proceeding.
+        echo "Checking health of Kubernetes deployments..."
+        # Initialize counters for retries
+        max_retries=12
+        sleep_interval=10
+        
+        # Function to check if deployment pods are running based on labels
+        check_deployment_running() {
+          local label_selector=$1
+          kubectl get pods --selector="$label_selector" -A --field-selector=status.phase=Running | grep -q 'Running'
+        }
+
+        # Define deployments and their respective label selectors and namespaces
+        declare -A deployments=(
+          ["ingress-nginx-controller"]="app.kubernetes.io/component=controller"
+          ["foo"]="app=foo"
+          ["bar"]="app=bar"
+        )
+
+        # Check each deployment for health
+        for deployment in "${!deployments[@]}"; do
+          echo "Checking $deployment deployment"
+          success=false
+          for ((i=0; i<$max_retries; i++)); do
+            if check_deployment_running "${deployments[$deployment]}" "$namespace"; then
+              echo "$deployment deployment is healthy."
+              success=true
+              break
+            else
+              echo "Waiting for $deployment deployment to become healthy..."
+              sleep $sleep_interval
+            fi
+          done
+          if [ "$success" = false ]; then
+            echo "Failed: $deployment deployment is not healthy after waiting."
+            exit 1
+          fi
+        done
 
     - name: Load Testing
       run: |
