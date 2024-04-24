@@ -1,0 +1,75 @@
+name: Goodnotes CI Task
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup KinD Cluster
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.14.0/kind-$(uname)-amd64
+        chmod +x ./kind
+        ./kind create cluster --config ./config/cluster.yaml
+
+    - name: Disable IPv6
+      run: |
+        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+
+    - name: Configuration, tools and dependencies
+      run: |
+        # sudo apt update && sudo apt upgrade -y
+        sudo apt install siege -y
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x ./kubectl
+        sudo mv ./kubectl /usr/local/bin/kubectl
+        chmod +x ./scripts/*.sh
+
+    - name: Deploy Applications and Ingress
+      run: |
+        kubectl apply -f ./config/deployment-bar.yaml
+        kubectl apply -f ./config/deployment-foo.yaml
+        kubectl apply -f ./config/ingress.yaml
+        sleep 15
+
+    - name: Deploy Ingress Controller
+      run: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+    - name: Wait for Deployments
+      run: |
+        sleep 15
+        kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx
+        kubectl wait --for=condition=available --timeout=300s deployment/bar
+        kubectl wait --for=condition=available --timeout=300s deployment/foo
+
+    - name: Load Testing
+      run: |
+        bash ./scripts/load-test.sh
+        # cat load-test-results.txt
+        # cat foo-load-test-results.txt
+        # cat bar-load-test-results.txt
+
+    - name: Post results to PR
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{secrets.GH_TOKEN}}
+        script: |
+          const fs = require('fs');
+          const siegeResults = fs.readFileSync('siege_results.txt', 'utf8');
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: siegeResults
+          })
