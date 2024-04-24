@@ -58,7 +58,7 @@ jobs:
           exit 1
         fi
 
-    - name: Verify Health of Specific Deployments
+    - name: Verify Health of Deployments
       run: |
         # Verifies that specific deployments are healthy before proceeding.
         echo "Checking health of Kubernetes deployments..."
