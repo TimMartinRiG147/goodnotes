@@ -1,1 +1,1 @@
-# goodnotes
+# goodnotes-timmy
