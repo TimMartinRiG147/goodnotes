@@ -58,15 +58,6 @@ jobs:
           exit 1
         fi
 
-    # - name: Wait for Deployments
-    #   run: |
-    #     # Ensures that all deployments are fully available before proceeding.
-    #     sleep 15
-    #     if ! kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx || ! kubectl wait --for=condition=available --timeout=300s deployment/bar || ! kubectl wait --for=condition=available --timeout=300s deployment/foo; then
-    #       echo "Deployment did not become available"
-    #       exit 1
-    #     fi
-
     - name: Verify Health of Specific Deployments
       run: |
         # Verifies that specific deployments are healthy before proceeding.
@@ -107,7 +98,6 @@ jobs:
             exit 1
           fi
         done
-
 
     - name: Load Testing
       run: |
