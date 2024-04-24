@@ -8,6 +8,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      KIND_VERSION: v0.14.0
+      KUBECTL_VERSION: stable
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -15,7 +18,7 @@ jobs:
     - name: Setup KinD Cluster
       run: |
         # Download and install KinD (Kubernetes in Docker).
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.14.0/kind-$(uname)-amd64
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-$(uname)-amd64
         chmod +x ./kind
         if ! ./kind create cluster --config ./config/cluster.yaml; then
           echo "Failed to create KinD cluster"
