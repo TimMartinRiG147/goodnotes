@@ -1,9 +1,6 @@
 name: Goodnotes CI Task
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -14,23 +11,26 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      # Checks out the repository under $GITHUB_WORKSPACE, so your workflow can access it.
 
     - name: Setup KinD Cluster
       run: |
+        # Download and install KinD (Kubernetes in Docker).
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.14.0/kind-$(uname)-amd64
         chmod +x ./kind
         ./kind create cluster --config ./config/cluster.yaml
 
     - name: Disable IPv6
       run: |
+        # Disables IPv6 on the system to avoid conflicts, necessary for some network setups.
         sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
         sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
         sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
 
     - name: Configuration, tools and dependencies
       run: |
-        # sudo apt update && sudo apt upgrade -y
-        sudo apt install siege -y
+        # Install necessary tools and updates.
+        sudo apt update && sudo apt install siege -y
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         chmod +x ./kubectl
         sudo mv ./kubectl /usr/local/bin/kubectl
@@ -38,27 +38,30 @@ jobs:
 
     - name: Deploy Applications and Ingress
       run: |
+        # Deploy Kubernetes applications and ingress.
         kubectl apply -f ./config/deployment-bar.yaml
         kubectl apply -f ./config/deployment-foo.yaml
         kubectl apply -f ./config/ingress.yaml
-        sleep 15
+        sleep 15 # Waits briefly to ensure resources are up before proceeding.
 
     - name: Deploy Ingress Controller
       run: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 
     - name: Wait for Deployments
       run: |
+        # Ensures that all deployments are fully available before proceeding.
         sleep 15
         kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx
         kubectl wait --for=condition=available --timeout=300s deployment/bar
         kubectl wait --for=condition=available --timeout=300s deployment/foo
+      # Add error handling in case deployments fail.
 
     - name: Load Testing
       run: |
+        # Executes a load test script and captures the output for reporting.
         bash ./scripts/load-test.sh
 
     - name: Post results to PR
-      if: github.event_name == 'pull_request'
       uses: actions/github-script@v6
       with:
         github-token: ${{ secrets.GH_TOKEN }}
