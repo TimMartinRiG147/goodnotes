@@ -58,26 +58,66 @@ jobs:
           exit 1
         fi
 
-    - name: Wait for Deployments
-      run: |
-        # Ensures that all deployments are fully available before proceeding.
-        sleep 15
-        if ! kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx || ! kubectl wait --for=condition=available --timeout=300s deployment/bar || ! kubectl wait --for=condition=available --timeout=300s deployment/foo; then
-          echo "Deployment did not become available"
-          exit 1
-        fi
+    # - name: Wait for Deployments
+    #   run: |
+    #     # Ensures that all deployments are fully available before proceeding.
+    #     sleep 15
+    #     if ! kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx || ! kubectl wait --for=condition=available --timeout=300s deployment/bar || ! kubectl wait --for=condition=available --timeout=300s deployment/foo; then
+    #       echo "Deployment did not become available"
+    #       exit 1
+    #     fi
 
     - name: Verify Health of Deployments and Ingress
       run: |
         # Verifies that all deployments and the Ingress are healthy before proceeding.
-        sleep 15
         echo "Checking health of Kubernetes resources..."
-        if ! kubectl get pods --all-namespaces | grep Running; then
-          echo "One or more pods are not in a Running state."
+        # Initialize counters for retries
+        max_retries=12
+        sleep_interval=10
+        
+        # Function to check pod status
+        check_pods() {
+          kubectl get pods --all-namespaces | grep Running
+        }
+
+        # Function to check ingress status
+        check_ingress() {
+          kubectl get ingress --all-namespaces | grep -i healthy
+        }
+
+        # Wait for pods to be in Running state
+        success=false
+        for ((i=0; i<$max_retries; i++)); do
+          if check_pods; then
+            echo "All pods are in the Running state."
+            success=true
+            break
+          else
+            echo "Waiting for pods to become healthy..."
+            sleep $sleep_interval
+          fi
+        done
+
+        if [ "$success" = false ]; then
+          echo "Failed: Some pods are not healthy after waiting."
           exit 1
         fi
-        if ! kubectl get ingress --all-namespaces | grep -i healthy; then
-          echo "Ingress is not in a healthy state."
+
+        # Wait for Ingress to be healthy
+        success=false
+        for ((i=0; i<$max_retries; i++)); do
+          if check_ingress; then
+            echo "Ingress is in a healthy state."
+            success=true
+            break
+          else
+            echo "Waiting for Ingress to become healthy..."
+            sleep $sleep_interval
+          fi
+        done
+
+        if [ "$success" = false ]; then
+          echo "Failed: Ingress is not healthy after waiting."
           exit 1
         fi
 
